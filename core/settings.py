@@ -91,7 +91,6 @@ DATABASES = {
         'USER': os.environ.get('DB_USER', 'default_user'),
         'PASSWORD': os.environ.get('DB_PASSWORD', '123'),
         'HOST': os.environ.get('DB_HOST', 'db'),
-        # 'HOST': 'localhost',
         'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
@@ -134,7 +133,7 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 
-SITE_NAME = "Test Django Next.js"
+SITE_NAME = "Music Admin"
 
 DOMAIN = 'localhost:3000'
 

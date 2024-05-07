@@ -2,47 +2,109 @@ from rest_framework import serializers
 from .models import Track, Playlist, Thumbnail
 from core.utils import YoutubeDLHelper
 from datetime import datetime, timezone
+import json
 
 class ThumbnailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Thumbnail
-        fields = "__all__"
+        fields = ['url', 'width', 'height']
 
 class TrackSerializer(serializers.ModelSerializer):
-    # thumbnails = ThumbnailSerializer(many=True, read_only=True)
+    thumbnails = ThumbnailSerializer(many=True)
+
     class Meta:
         model = Track
         fields = "__all__"
     
-    def is_valid(self, ydl: YoutubeDLHelper = None):
-        self.initial_data['upload_id'] = self.initial_data['id']
-        self.initial_data['timestamp'] = datetime.fromtimestamp(self.initial_data['timestamp'], tz=timezone.utc)
-        for k in ['view_count', 'like_count', 'comment_count', 'genre']:
-            if self.initial_data[k] is None:
-                self.initial_data[k] = "" if k == 'genre' else 0
-        for k in ['id','description','license','formats','thumbnails']:        
-            del self.initial_data[k]
-        return super().is_valid()
+    def __init__(self, *args, **kwargs):
+        ydl = None
+        data = kwargs.get('data')
+        if args and isinstance(args[0], YoutubeDLHelper):
+            ydl = args[0]
+            args = args[1:]
+            data = ydl.info
+
+        if data and isinstance(data, dict):
+            data['upload_id'] = data['id']
+            data['timestamp'] = datetime.fromtimestamp(data['timestamp'], tz=timezone.utc)
+            for thumbnail in data['thumbnails']:
+                for k in ['id', 'preference', 'resolution']:
+                    if k in thumbnail:
+                        del thumbnail[k]
+            default_fields = {
+                'view_count': 0,
+                'like_count': 0,
+                'comment_count': 0,
+                'genre': '',
+                'vcodec': 0,
+                'video_ext': 0
+            }
+            for k, default in default_fields.items():
+                if data.get(k) is None or data[k] == "none":
+                    data[k] = default
+            
+            remove_keys = [
+                'id', '__last_playlist_index', '_filename', '_has_drm', '_type', '_version',
+                'aspect_ratio', 'audio_ext', 'description', 'display_id', 'duration_string',
+                'epoch', 'filename', 'format_id', 'format', 'formats', 'fulltitle', 'http_headers',
+                'license', 'n_entries', 'original_url', 'playlist_autonumber', 'playlist_count',
+                'playlist_id', 'playlist_index', 'playlist_title', 'playlist_uploader_id',
+                'playlist_uploader', 'playlist', 'preference', 'protocol', 'release_year',
+                'requested_subtitles', 'resolution', 'thumbnail', 'upload_date', 'vbr', 'video_ext'
+            ]
+            for k in remove_keys:
+                if k in data:
+                    del data[k]
+            
+            kwargs['data'] = data
+        super(TrackSerializer, self).__init__(*args, **kwargs)
+
+    def create(self, validated_data):
+        thumbnails = validated_data.pop('thumbnails', [])
+        track = Track.objects.create(**validated_data)
+        for thumbnail in thumbnails:
+            Thumbnail.objects.create(track=track, **thumbnail)
+        return track
 
 class PlaylistSerializer(serializers.ModelSerializer):
-    tracks = TrackSerializer(many=True, read_only=True)
+    tracks = TrackSerializer(many=True)
     class Meta:
         model = Playlist
         fields = "__all__"
+    
+    def __init__(self, *args, **kwargs):
+        ydl = None
+        if args and isinstance(args[0], YoutubeDLHelper):
+            ydl = args[0]
+            args = args[1:] 
+        if ydl and hasattr(ydl, 'info') and isinstance(ydl.info, list):
+            kwargs['data'] = {
+                'title': ydl.info[0]['playlist_title'],
+                'upload_id': ydl.info[0]['id'],
+                'uploader': ydl.parts[3],
+                'extractor': ydl.info[0]['extractor'],
+                'extractor_key': ydl.info[0]['extractor_key'],
+                'webpage_url': ydl.url,
+                'webpage_url_basename': ydl.parts[5],
+                'tracks': []
+            }
+            for track in ydl.info:
+                serializer = TrackSerializer(data=track)
+                if serializer.is_valid():
+                    kwargs['data']['tracks'].append(serializer.validated_data)
+                else:
+                    print(serializer.errors)
+                    exit(serializer.errors)
+            
+        super(PlaylistSerializer, self).__init__(*args, **kwargs)
 
-    def is_valid(self, ydl: YoutubeDLHelper):
-        self.initial_data['upload_id'] = self.initial_data['id']
-        self.initial_data['uploader'] = self.initial_data['webpage_url'].split("/")[3]
-        self.initial_data['tracks'] = []
-        for entry in self.initial_data['entries']:
-            track_serializer = TrackSerializer(data=ydl.extract_info(url=entry["url"]))
-            if track_serializer.is_valid():
-                track = track_serializer.save()
-                self.initial_data['tracks'].append(track.id)
-            else:
-                print(track_serializer.data)
-                print(track_serializer.errors)
-                exit()
-        for k in ['id','_type','entries']:        
-            del self.initial_data[k]
-        return super().is_valid()
+    def create(self, validated_data):
+        tracks = validated_data.pop('tracks', [])
+        playlist = Playlist.objects.create(**validated_data)
+        for track in tracks:
+            thumbnails = track.pop('thumbnails', [])
+            track = Track.objects.create(**track)
+            for thumbnail in thumbnails:
+                Thumbnail.objects.create(**thumbnail, track=track)
+            playlist.tracks.add(track)
+        return playlist

@@ -9,15 +9,11 @@ from .serializers import TrackSerializer, PlaylistSerializer, ThumbnailSerialize
 
 from django.core.exceptions import ObjectDoesNotExist
 from core.utils import S3Client, YoutubeDLHelper
-
 from django.forms.models import model_to_dict
-
-import os
 
 class YoutubeDLView(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = ()
-    ydl = None
 
     def get(self, request):
         if request.query_params.get('type') is None:
@@ -33,32 +29,30 @@ class YoutubeDLView(APIView):
     
     def post(self, request):
         try:
-            self.ydl = YoutubeDLHelper(request.data["url"])
-            info = self.ydl.extract_info()
-            if self.ydl.type == 'track':
-                self.ydl.path = os.path.join(self.ydl.path,f"{info['webpage_url_basename']}.mp3")
+            ydl = YoutubeDLHelper(request.data["url"])
             response = {
                 'success': False,
-                'info': info,
-                'path': self.ydl.path,
-                'type': self.ydl.type,
+                'info': ydl.info,
+                'parts': ydl.parts,
+                'path': ydl.path,
+                'url': ydl.url,
+                'type': ydl.type,
+                # 'download_and_upload_s3': ydl.download_and_upload_s3(),
             }
             # return Response(data=response,status=status.HTTP_200_OK)
+            
+            # ydl.download([request.data["url"]])
+            # response['s3'] = S3Client().upload_file(file_input=ydl.path, object_name=ydl.path.split("/media/",1)[1])
 
-            if self.ydl.exists():
-                response['msg'] = f'{self.ydl.type.capitalize()} already exists'
-            else:
-                # self.ydl.download([request.data["url"]])
-
-                if self.ydl.exists() or True:
-                    serializer = TrackSerializer(data=info) if self.ydl.type == 'track' else PlaylistSerializer(data=info)
-                    response['is_valid'] = serializer.is_valid(self.ydl)
-                    response['errors'] = serializer.errors
-                    if response['is_valid']:
-                        response['msg'] = f'{self.ydl.type.capitalize()} downloaded'
-                        response['path'] = self.ydl.path
-                        response['success'] = bool(serializer.save())
-                        # response['s3'] = S3Client().upload_file(file_input=self.ydl.path, object_name=self.ydl.path.split("/media/",1)[1])
+            # S3 upload successful
+            if ydl.download_and_upload_s3():
+                serializer = TrackSerializer(ydl) if ydl.type == 'track' else PlaylistSerializer(ydl)
+                response['s3_uploaded'] = ydl.uploaded
+                response['is_valid'] = serializer.is_valid()
+                response['errors'] = serializer.errors
+                if response['is_valid']:
+                    # response['msg'] = f'{ydl.type.capitalize()} downloaded'
+                    response['success'] = bool(serializer.save())
 
             return Response(data=response,status=status.HTTP_200_OK)
         except (ObjectDoesNotExist, TokenError):

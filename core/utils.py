@@ -1,18 +1,23 @@
+from datetime import datetime, timezone
+import json
+import subprocess
 from dotenv import load_dotenv
 import youtube_dl
 import os
 import boto3
+import concurrent.futures
 from PIL import Image
 import io
 
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 class S3Client:
     s3_client = None
     def __init__(self):
-        load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+        
         self.s3_client = boto3.client(
             's3',
             aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
         )
         self.bucket_name = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 
@@ -38,9 +43,13 @@ class S3Client:
                 object_name = file_input.name
 
         try:
-            self.s3_client.upload_fileobj(file, self.bucket_name, object_name)
+            self.s3_client.upload_fileobj(file, self.bucket_name, object_name, ExtraArgs={'ACL': 'public-read'})
             file_url = f"https://{self.bucket_name}.s3.{os.environ.get('AWS_S3_REGION_NAME')}.amazonaws.com/{object_name}"
-            response = {"success": True, "message": f"'{object_name}' uploaded successfully.", "file_url": file_url}
+            response = {
+                "success": True,
+                "message": f"'{object_name}' uploaded successfully.",
+                "file_url": file_url
+            }
         except Exception as e:
             return {"success": False, "message": str(e)}
         finally:
@@ -82,25 +91,43 @@ class YoutubeDLHelper:
     path = ''
     type = ''
     url = ''
+    info = []
+    uploaded = []
     def __init__(self, url) -> None:
         self.url = url
+        self.info = self.extract_info_cmd(url)
+    
+    def extract_info_cmd(self, url=None) -> None:
+        command = [
+            'yt-dlp',
+            '--skip-download',
+            '--print-json',
+            url
+        ]
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        info = []
+        for line in process.stdout:
+            strip = line.strip()
+            if strip:
+                info.append(json.loads(strip))
+        errors = process.stderr.read()
+        if errors:
+            exit(f"Error extracting metadata: {errors}")
+
+        process.stdout.close()
+        process.stderr.close()
+        process.wait()
+
         self.parts = url.split("/")
-        folder = 'tracks'
-        self.type = 'track'
-        if self.parts[4] == 'sets':
-            folder = self.parts[5]
-            self.type = 'playlist'
-        self.path = os.path.join('/','media', self.parts[3], folder)
-        self.ydl = youtube_dl.YoutubeDL({
-            'format': 'bestaudio/best',
-            'outtmpl': os.path.join(self.path, '%(webpage_url_basename)s.%(ext)s'),
-            'noplaylist': False,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '320',
-            }]
-        })
+        if len(info) > 1:
+            self.type = "playlist"
+            save_directory = self.parts[5]
+        else:
+            info = info[0]
+            self.type = "track"
+            save_directory = os.path.join("tracks",f"{info['webpage_url_basename']}.{info['ext']}")
+        self.path = os.path.join(self.parts[3],save_directory)
+        return info
 
     def download(self, url=None) -> None:
         if url is None:
@@ -114,3 +141,42 @@ class YoutubeDLHelper:
     
     def exists(self) -> bool:
         return self.type == 'track' and os.path.isfile(self.path) or self.type == 'playlist' and os.path.isdir(self.path)
+    
+    def download_and_upload_s3(self) -> bool:
+        s3_region = os.environ.get('AWS_S3_REGION_NAME')
+        s3_bucket = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+        tracks = self.info if self.type == "playlist" else [self.info]
+
+        def process_track(track) -> any:
+            s3_key = os.path.join(self.path, f"{track['webpage_url_basename']}.{track['ext']}") if self.type == "playlist" else self.path
+            download_command = [
+                'yt-dlp',
+                '--format', 'bestaudio/best',
+                '--extract-audio',
+                '--audio-format', 'mp3',
+                '--audio-quality', '0',
+                '-o', '-',
+                track['webpage_url']
+            ]
+            upload_command = [
+                'aws', 's3', 'cp', '-', 
+                f's3://{s3_bucket}/{s3_key}',
+                '--acl', 'public-read'
+            ]
+            download_process = subprocess.Popen(download_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            upload_process = subprocess.Popen(upload_command, stdin=download_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            download_process.stdout.close()
+            output, errors = upload_process.communicate()
+            if upload_process.returncode == 0:
+                print(f"Uploaded: {s3_key}")
+                return f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{s3_key}"
+            else:
+                print(f"Error uploading {track['webpage_url_basename']}: {errors.decode()}")
+                return None
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process_track, track) for track in tracks]
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    self.uploaded.append(result)
+        return bool(self.uploaded)

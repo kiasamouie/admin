@@ -1,0 +1,28 @@
+# Ignore all log files
+*.log
+
+# Ignore node modules to prevent overriding the container's node_modules
+node_modules/
+
+# Ignore environments variablez
+.env
+
+# Ignore Python virtual environments
+venv/
+env/
+__pycache__/
+
+# Ignore certain specific files or directories
+.DS_Store
+.git
+.gitignore
+README.md
+
+# Ignore build outputs
+dist/
+build/
+*.pyc
+
+# Ignore development configuration files
+*.env
+*.config

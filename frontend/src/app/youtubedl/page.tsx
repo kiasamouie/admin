@@ -22,7 +22,9 @@ export default function Home() {
   } = useForm<FormData>();
 
   const { data: playlists } = useSWR("/api/youtubedl?type=playlists", fetcher);
+  const { data: tracks } = useSWR("/api/youtubedl?type=tracks", fetcher);
   console.log(playlists)
+  console.log(tracks)
   const { download } = YoutubeDLActions();
 
   const onSubmit = (data: FormData) => {
@@ -50,7 +52,7 @@ export default function Home() {
               type="text"
               placeholder="URL"
               {...register("url", { required: true })}
-              value="https://soundcloud.com/thekiadoe/ascend"
+              // value="https://soundcloud.com/thekiadoe/ascend"
               className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
             />
             {errors.url && (

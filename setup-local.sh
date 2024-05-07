@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Fix Error
+# sed -i 's/\r$//' filename
+
 # Exit script if any command fails
 set -e
 
@@ -13,16 +16,21 @@ echo_progress() {
     echo -e "\033[0;33m$1\033[0m"
 }
 
+# # Update package manager and install ffmpeg, npm
+# echo_progress "Setting up ffmpeg..."
+# apt-get update
+# apt-get install -y ffmpeg && apt-get install -y npm
+
 # Setup Backend
 echo_progress "Setting up backend..."
-py -m venv venv || { echo "Failed to create virtual environment"; exit 1; }
-source venv/Scripts/activate || { echo "Failed to activate virtual environment"; exit 1; }
-python.exe -m pip install --upgrade pip || { echo "Failed to upgrade pip"; exit 1; }
+python -m venv env || { echo "Failed to create virtual environment"; exit 1; }
+source env/bin/activate || { echo "Failed to activate virtual environment"; exit 1; }
+python -m pip install --upgrade pip || { echo "Failed to upgrade pip"; exit 1; }
 pip install -r requirements.txt || { echo "Failed to install backend requirements"; exit 1; }
 
 # Django Migrations
-python manage.py migrate || { echo "Django migrate command failed"; exit 1; }
-echo_success "Done setting up backend."
+# python manage.py migrate || { echo "Django migrate command failed"; exit 1; }
+# echo_success "Done setting up backend."
 
 # Setup Frontend
 echo_progress "Setting up frontend..."
