@@ -11,7 +11,7 @@ const api = wretch("http://localhost:8000").accept("application/json");
  */
 const download = (url: string) => {
   console.log(url)
-  return api.post({ url: url }, "/api/youtubedl/");
+  return api.post({ url: url }, "/api/youtubedl/download/");
 };
 
 /**

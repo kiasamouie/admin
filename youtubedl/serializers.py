@@ -46,11 +46,12 @@ class TrackSerializer(serializers.ModelSerializer):
             remove_keys = [
                 'id', '__last_playlist_index', '_filename', '_has_drm', '_type', '_version',
                 'aspect_ratio', 'audio_ext', 'description', 'display_id', 'duration_string',
-                'epoch', 'filename', 'format_id', 'format', 'formats', 'fulltitle', 'http_headers',
-                'license', 'n_entries', 'original_url', 'playlist_autonumber', 'playlist_count',
-                'playlist_id', 'playlist_index', 'playlist_title', 'playlist_uploader_id',
-                'playlist_uploader', 'playlist', 'preference', 'protocol', 'release_year',
-                'requested_subtitles', 'resolution', 'thumbnail', 'upload_date', 'vbr', 'video_ext'
+                'epoch', 'filename','filesize_approx','format_id', 'format', 'formats', 'fulltitle','genres', 
+                'http_headers','license', 'n_entries', 'original_url', 'playlist_autonumber', 
+                'playlist_count','playlist_id', 'playlist_index', 'playlist_title', 
+                'playlist_uploader_id','playlist_uploader', 'playlist', 'preference', 'protocol', 
+                'release_year','requested_subtitles', 'resolution', 'thumbnail', 'upload_date', 'vbr', 
+                'video_ext'
             ]
             for k in remove_keys:
                 if k in data:
@@ -76,14 +77,15 @@ class PlaylistSerializer(serializers.ModelSerializer):
         ydl = None
         if args and isinstance(args[0], YoutubeDLHelper):
             ydl = args[0]
-            args = args[1:] 
+            args = args[1:]
+            data = ydl.info[0]
         if ydl and hasattr(ydl, 'info') and isinstance(ydl.info, list):
             kwargs['data'] = {
-                'title': ydl.info[0]['playlist_title'],
-                'upload_id': ydl.info[0]['id'],
+                'title': data['playlist_title'],
+                'upload_id': data['playlist_id'],
                 'uploader': ydl.parts[3],
-                'extractor': ydl.info[0]['extractor'],
-                'extractor_key': ydl.info[0]['extractor_key'],
+                'extractor': data['extractor'],
+                'extractor_key': data['extractor_key'],
                 'webpage_url': ydl.url,
                 'webpage_url_basename': ydl.parts[5],
                 'tracks': []
@@ -95,7 +97,6 @@ class PlaylistSerializer(serializers.ModelSerializer):
                 else:
                     print(serializer.errors)
                     exit(serializer.errors)
-            
         super(PlaylistSerializer, self).__init__(*args, **kwargs)
 
     def create(self, validated_data):

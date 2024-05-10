@@ -1,21 +1,23 @@
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Track, Playlist, Thumbnail
 from .serializers import TrackSerializer, PlaylistSerializer, ThumbnailSerializer
 
 from django.core.exceptions import ObjectDoesNotExist
-from core.utils import S3Client, YoutubeDLHelper
+from core.utils import YoutubeDLHelper
 from django.forms.models import model_to_dict
 
-class YoutubeDLView(APIView):
+class YoutubeDLViewSet(viewsets.ViewSet):
     permission_classes = (AllowAny,)
     authentication_classes = ()
+    queryset = Track.objects.all()
+    serializer_class = TrackSerializer
 
-    def get(self, request):
+    def list(self, request):
         if request.query_params.get('type') is None:
             return Response(data={'msg': 'Type missing'},status=status.HTTP_400_BAD_REQUEST)
         
@@ -27,7 +29,8 @@ class YoutubeDLView(APIView):
             serializer = PlaylistSerializer(records, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def post(self, request):
+    @action(methods=['post'], detail=False)
+    def download(self, request):
         try:
             ydl = YoutubeDLHelper(request.data["url"])
             response = {
@@ -40,9 +43,6 @@ class YoutubeDLView(APIView):
                 # 'download_and_upload_s3': ydl.download_and_upload_s3(),
             }
             # return Response(data=response,status=status.HTTP_200_OK)
-            
-            # ydl.download([request.data["url"]])
-            # response['s3'] = S3Client().upload_file(file_input=ydl.path, object_name=ydl.path.split("/media/",1)[1])
 
             # S3 upload successful
             if ydl.download_and_upload_s3():

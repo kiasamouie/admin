@@ -2,8 +2,8 @@ from django.db import models
 
 class Track(models.Model):
     title = models.CharField(max_length=255)
-    # s3_file_url = models.URLField(max_length=1024, blank=True, null=True)
-    # s3_file_key = models.CharField(max_length=1024, blank=True, null=True)
+    s3_file_url = models.URLField(max_length=1024)
+    s3_file_key = models.CharField(max_length=1024)
     upload_id = models.IntegerField()
     uploader = models.CharField(max_length=255)
     uploader_id = models.CharField(max_length=255)
