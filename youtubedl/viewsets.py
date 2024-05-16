@@ -14,19 +14,17 @@ from django.forms.models import model_to_dict
 class YoutubeDLViewSet(viewsets.ViewSet):
     permission_classes = (AllowAny,)
     authentication_classes = ()
-    queryset = Track.objects.all()
-    serializer_class = TrackSerializer
 
     def list(self, request):
         if request.query_params.get('type') is None:
             return Response(data={'msg': 'Type missing'},status=status.HTTP_400_BAD_REQUEST)
         
         if request.query_params.get('type') == 'tracks':
-            records = Track.objects.all()
-            serializer = TrackSerializer(records, many=True)
+            queryset = Track.objects.all()
+            serializer = TrackSerializer(queryset, many=True)
         else:
-            records = Playlist.objects.all()
-            serializer = PlaylistSerializer(records, many=True)
+            queryset = Playlist.objects.all()
+            serializer = PlaylistSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(methods=['post'], detail=False)
@@ -40,20 +38,47 @@ class YoutubeDLViewSet(viewsets.ViewSet):
                 'path': ydl.path,
                 'url': ydl.url,
                 'type': ydl.type,
-                # 'download_and_upload_s3': ydl.download_and_upload_s3(),
+                's3_uploaded': ydl.download_and_upload_s3(),
             }
             # return Response(data=response,status=status.HTTP_200_OK)
 
             # S3 upload successful
-            if ydl.download_and_upload_s3():
-                serializer = TrackSerializer(ydl) if ydl.type == 'track' else PlaylistSerializer(ydl)
-                response['s3_uploaded'] = ydl.uploaded
-                response['is_valid'] = serializer.is_valid()
-                response['errors'] = serializer.errors
-                if response['is_valid']:
-                    # response['msg'] = f'{ydl.type.capitalize()} downloaded'
-                    response['success'] = bool(serializer.save())
+            serializer = TrackSerializer(ydl) if ydl.type == 'track' else PlaylistSerializer(ydl)
+            response['is_valid'] = serializer.is_valid()
+            response['errors'] = serializer.errors
+            if response['is_valid']:
+                # response['msg'] = f'{ydl.type.capitalize()} downloaded'
+                response['success'] = bool(serializer.save())
 
             return Response(data=response,status=status.HTTP_200_OK)
         except (ObjectDoesNotExist, TokenError):
             return Response(status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(methods=['get'], detail=False)
+    def stats(self, request):
+        return Response([
+            {
+                'title': 'Tracks',
+                'total': Track.objects.count(),
+                'rate': '0.43%',
+                'levelUp': True,
+                'levelDown': False,
+                'icon': 'faMusic'
+            },
+            {
+                'title': 'Playlists',
+                'total': Playlist.objects.count(),
+                'rate': '0.43%',
+                'levelUp': True,
+                'levelDown': False,
+                'icon': 'faClipboardList'
+            },
+            {
+                'title': 'Thumbnails',
+                'total': Thumbnail.objects.count(),
+                'rate': '0.43%',
+                'levelUp': True,
+                'levelDown': False,
+                'icon': 'faImage'
+            }
+        ], status=status.HTTP_200_OK)

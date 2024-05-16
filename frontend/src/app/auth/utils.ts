@@ -1,5 +1,6 @@
 import wretch from "wretch";
 import Cookies from "js-cookie";
+import { toast } from "react-toastify";
 
 // Base API setup for making HTTP requests
 const api = wretch("http://localhost:8000").accept("application/json");
@@ -9,7 +10,7 @@ const api = wretch("http://localhost:8000").accept("application/json");
  * @param {string} token - The token to be stored.
  * @param {"access" | "refresh"} type - The type of the token (access or refresh).
  */
-const storeToken = (token: string, type: "access" | "refresh") => {
+const storeToken = (token: string, type: "access" | "refresh" | "user") => {
   Cookies.set(type + "Token", token);
 };
 
@@ -19,7 +20,8 @@ const storeToken = (token: string, type: "access" | "refresh") => {
  * @returns {string | undefined} The token, if found.
  */
 const getToken = (type: string) => {
-  return Cookies.get(type + "Token");
+  let token = Cookies.get(type + "Token")
+  return type == "user" && token ? JSON.parse(token) : token;
 };
 
 /**
@@ -31,6 +33,13 @@ const removeTokens = () => {
 };
 
 /**
+ * Is user logged in?
+ */
+const loggedIn = () => {
+  return !!getToken("access")
+};
+
+/**
  * Registers a new user.
  * @param {string} email - The email of the account.
  * @param {string} username - The username of the account.
@@ -38,7 +47,6 @@ const removeTokens = () => {
  * @returns {Promise} A promise that resolves with the registration response.
  */
 const register = (email: string, username: string, password: string) => {
-  console.log(Cookies)
   return api.post({ email, username, password }, "/auth/users/");
 };
 
@@ -49,8 +57,24 @@ const register = (email: string, username: string, password: string) => {
  * @returns {Promise} A promise that resolves with the login response.
  */
 const login = (email: string, password: string) => {
-  console.log(Cookies.get('csrftoken'))
-  return api.post({ username: email, password }, "/auth/jwt/create");
+  return api.post({ username: email, password }, "/auth/jwt/create/")
+    .json((user) => {
+      if (user.access) {
+        const accessToken = user.access;
+        const refreshToken = user.refresh;
+        storeToken(accessToken, "access");
+        storeToken(refreshToken, "refresh");
+        delete user.access;
+        delete user.refresh;
+        storeToken(JSON.stringify(user), "user");
+        toast.success('Logged in!');
+        window.location.replace("/")
+      }
+    })
+    .catch((err) => {
+      console.log(err)
+      toast.error('Error logging in!');
+    });
 };
 
 /**
@@ -101,16 +125,6 @@ const resetPasswordConfirm = (
 };
 
 /**
- * Download using YoutubeDL with url.
- * @param {string} url - The YoutubeDL url.
- * @returns {Promise} A promise that resolves with the download response.
- */
-const download = (url: string) => {
-  console.log(url)
-  return api.post({ url: url }, "/api/content/download");
-};
-
-/**
  * Exports authentication-related actions.
  * @returns {Object} An object containing all the auth actions.
  */
@@ -123,8 +137,8 @@ export const AuthActions = () => {
     resetPassword,
     storeToken,
     getToken,
+    loggedIn,
     logout,
-    removeTokens,
-    download
+    removeTokens
   };
 };

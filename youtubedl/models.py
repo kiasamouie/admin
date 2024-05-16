@@ -2,8 +2,8 @@ from django.db import models
 
 class Track(models.Model):
     title = models.CharField(max_length=255)
-    s3_file_url = models.URLField(max_length=1024)
-    s3_file_key = models.CharField(max_length=1024)
+    s3_file_url = models.URLField(max_length=1024,blank=True,null=True)
+    s3_file_key = models.CharField(max_length=1024,blank=True,null=True)
     upload_id = models.IntegerField()
     uploader = models.CharField(max_length=255)
     uploader_id = models.CharField(max_length=255)
@@ -20,7 +20,6 @@ class Track(models.Model):
     webpage_url_domain = models.CharField(max_length=255)
     extractor = models.CharField(max_length=50)
     extractor_key = models.CharField(max_length=50)
-    url = models.URLField(max_length=1024)
     tbr = models.IntegerField(null=True)
     ext = models.CharField(max_length=10)
 

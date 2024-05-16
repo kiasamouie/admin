@@ -10,7 +10,7 @@ class ThumbnailSerializer(serializers.ModelSerializer):
         fields = ['url', 'width', 'height']
 
 class TrackSerializer(serializers.ModelSerializer):
-    thumbnails = ThumbnailSerializer(many=True)
+    thumbnails = ThumbnailSerializer(many=True, write_only=True)
 
     class Meta:
         model = Track
@@ -22,7 +22,7 @@ class TrackSerializer(serializers.ModelSerializer):
         if args and isinstance(args[0], YoutubeDLHelper):
             ydl = args[0]
             args = args[1:]
-            data = ydl.info
+            data = ydl.info[0]
 
         if data and isinstance(data, dict):
             data['upload_id'] = data['id']
@@ -50,7 +50,7 @@ class TrackSerializer(serializers.ModelSerializer):
                 'http_headers','license', 'n_entries', 'original_url', 'playlist_autonumber', 
                 'playlist_count','playlist_id', 'playlist_index', 'playlist_title', 
                 'playlist_uploader_id','playlist_uploader', 'playlist', 'preference', 'protocol', 
-                'release_year','requested_subtitles', 'resolution', 'thumbnail', 'upload_date', 'vbr', 
+                'release_year','requested_subtitles', 'resolution', 'thumbnail', 'upload_date','url', 'vbr', 
                 'video_ext'
             ]
             for k in remove_keys:
@@ -59,6 +59,14 @@ class TrackSerializer(serializers.ModelSerializer):
             
             kwargs['data'] = data
         super(TrackSerializer, self).__init__(*args, **kwargs)
+    
+    def to_representation(self, instance):
+        """
+        Remove the 'thumbnails' field from the serialized output.
+        """
+        representation = super().to_representation(instance)
+        representation.pop('thumbnails', None)  # Remove 'thumbnails' from the output
+        return representation
 
     def create(self, validated_data):
         thumbnails = validated_data.pop('thumbnails', [])

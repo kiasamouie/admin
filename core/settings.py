@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "django_extensions",
     # created apps
+    'core.apps.CoreConfig',
     "youtubedl",
 ]
 
@@ -168,5 +169,23 @@ DJOSER = {
     "SERIALIZERS": {
         'user': 'core.serializers.CustomUserSerializer',
         'current_user': 'core.serializers.CustomUserSerializer',
+    },
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'db': {
+            'level': 'INFO',
+            'class': 'core.log_handler.DatabaseLogHandler',  # Use the correct path
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['db'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }

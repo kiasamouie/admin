@@ -1,15 +1,18 @@
+import logging
 from datetime import datetime, timezone
 import json
 import subprocess
 from dotenv import load_dotenv
-import youtube_dl
 import os
 import boto3
 import concurrent.futures
-from PIL import Image
-import io
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+logger = logging.getLogger(__name__)  
+
+def log(message):
+    logger.info(message)
+
 class YoutubeDLHelper:
     ydl = None
     parts = ''
@@ -49,15 +52,17 @@ class YoutubeDLHelper:
             self.type = "playlist"
             save_directory = self.parts[5]
         else:
-            info = info[0]
             self.type = "track"
-            save_directory = os.path.join("tracks",f"{info['webpage_url_basename']}.mp3")
+            save_directory = os.path.join("tracks",f"{info[0]['webpage_url_basename']}.mp3")
         self.path = os.path.join(self.parts[3],save_directory)
         return info
 
-    def download_and_upload_s3(self) -> bool:
+    def download_and_upload_s3(self) -> any:
         s3 = S3Client()
-        tracks = self.info if self.type == "playlist" else [self.info]
+        if s3.client is None:
+            msg = "S3 CREDENTIALS MISSING"
+            log(msg)
+            return msg
 
         def process_track(track) -> any:
             key = os.path.join(self.path, f"{track['webpage_url_basename']}.mp3") if self.type == "playlist" else self.path
@@ -91,27 +96,30 @@ class YoutubeDLHelper:
                 print(f"Error uploading {track['webpage_url_basename']}: {errors.decode()}")
                 return None
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(process_track, track) for track in tracks]
+            futures = [executor.submit(process_track, track) for track in self.info]
             for future in concurrent.futures.as_completed(futures):
                 result = future.result()
                 if result:
                     self.uploaded.append(result)
-        return bool(self.uploaded)
+        return self.uploaded
     
 class S3Client:
-    s3_client = None
-    def __init__(self):
-        self.s3_client = boto3.client(
+    client = None
+    def __init__(self) -> None:
+        if os.environ.get('AWS_ACCESS_KEY_ID') is None or os.environ.get('AWS_SECRET_ACCESS_KEY') is None:
+            return None
+        self.client = boto3.client(
             's3',
             aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
             aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
         )
         self.bucket = os.environ.get('AWS_STORAGE_BUCKET_NAME')
         self.region = os.environ.get('AWS_S3_REGION_NAME')
-
+        
+    
     def file_exists(self, key: str):
         try:
-            self.s3_client.head_object(Bucket=self.bucket, Key=key)
+            self.client.head_object(Bucket=self.bucket, Key=key)
             return True
         except:
             return False
@@ -123,7 +131,7 @@ class S3Client:
 
     def delete(self, key):
         try:
-            self.s3_client.delete_object(Bucket=self.bucket, Key=key)
+            self.client.delete_object(Bucket=self.bucket, Key=key)
             return True
         except:
             return False

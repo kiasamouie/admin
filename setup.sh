@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Fix Error
-# sed -i 's/\r$//' filename
-
 # Exit script if any command fails
 set -e
 
@@ -16,10 +13,10 @@ echo_progress() {
     echo -e "\033[0;33m$1\033[0m"
 }
 
-# Update package manager and install ffmpeg, npm
+# Update package manager and install ffmpeg, npm, awscli
 echo_progress "Setting up ffmpeg..."
 apt-get update
-apt-get install -y ffmpeg && apt-get install -y npm && apt-get install awscli
+apt-get install -y ffmpeg npm awscli
 
 # Setup Backend
 echo_progress "Setting up backend..."
@@ -28,7 +25,7 @@ source env/bin/activate || { echo "Failed to activate virtual environment"; exit
 python -m pip install --upgrade pip || { echo "Failed to upgrade pip"; exit 1; }
 pip install -r requirements.txt || { echo "Failed to install backend requirements"; exit 1; }
 
-# Django Migrations
+# Django Migrations (commented out, uncomment if needed)
 # python manage.py migrate || { echo "Django migrate command failed"; exit 1; }
 
 # Create superuser non-interactively
@@ -45,4 +42,3 @@ echo_success "Done setting up frontend."
 cd .. # Go back to the root directory
 
 echo_success "Project is ready"
-

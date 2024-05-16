@@ -47,3 +47,12 @@ const api = () => {
 export const fetcher = (url: string): Promise<any> => {
   return api().get(url).json();
 };
+
+/**
+ * Fetches data from the specified URL, automatically handling authentication and token refresh.
+ * @returns {Promise<any>} The promise resolving to the fetched data.
+ * @param url
+ */
+export const current_user = (url: string): Promise<any> => {
+  return api().get("/auth/users/me/").json();
+};
