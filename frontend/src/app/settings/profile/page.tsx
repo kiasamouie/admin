@@ -6,7 +6,7 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCamera, faPen, faEdit } from '@fortawesome/free-solid-svg-icons';
+import { faCamera, faEdit } from '@fortawesome/free-solid-svg-icons';
 import { faFacebook, faGithub, faInstagram, faLinkedin, faTwitter } from "@fortawesome/free-brands-svg-icons";
 import { AuthActions } from "@/app/auth/utils";
 const { getToken } = AuthActions();

@@ -11,6 +11,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 logger = logging.getLogger(__name__)  
 
 def log(message):
+    print(message)
     logger.info(message)
 
 class YoutubeDLHelper:
@@ -68,7 +69,7 @@ class YoutubeDLHelper:
             key = os.path.join(self.path, f"{track['webpage_url_basename']}.mp3") if self.type == "playlist" else self.path
 
             if s3.file_exists(key):
-                print(f"File already exists: {key}")
+                log(f"File already exists: {key}")
                 return s3.file_url(track, key)
             
             download_cmd = [
@@ -80,6 +81,7 @@ class YoutubeDLHelper:
                 '-o', '-',
                 track['webpage_url']
             ]
+            exit(download_cmd)
             upload_cmd = [
                 'aws', 's3', 'cp', '-',
                 f's3://{s3.bucket}/{key}',
@@ -90,10 +92,10 @@ class YoutubeDLHelper:
             download.stdout.close()
             output, errors = upload.communicate()
             if upload.returncode == 0:
-                print(f"Uploaded: {key}")
+                log(f"Uploaded: {key}")
                 return s3.file_url(track, key)
             else:
-                print(f"Error uploading {track['webpage_url_basename']}: {errors.decode()}")
+                log(f"Error uploading {track['webpage_url_basename']}: {errors.decode()}")
                 return None
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(process_track, track) for track in self.info]

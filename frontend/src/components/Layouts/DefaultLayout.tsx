@@ -12,27 +12,8 @@ export default function DefaultLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { loggedIn } = AuthActions();
-  const router = useRouter();
   
-  useEffect(() => {
-    // Check if the user is logged in and update the loading state accordingly
-    const checkAuth = async () => {
-      const isLoggedIn = await loggedIn();
-      setLoading(false);
-      if (!isLoggedIn) {
-        router.push("/auth/signin")
-      }
-    };
-    checkAuth();
-  }, []);
-
-  if (loading) {
-    // Render a loading spinner or message until the authentication check is complete
-    return <Loader />;
-  }
-
   return (
     <>
       {/* <!-- ===== Page Wrapper Start ===== --> */}

@@ -4,18 +4,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretRight, faDashboard, faDownload, faUser, faWrench } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretRight } from '@fortawesome/free-solid-svg-icons';
+
+import { sidebarMenu, SidebarMenuItem } from './sidebarMenu';
 
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (arg: boolean) => void;
-}
-
-interface SidebarMenuItem {
-  title: string;
-  icon?: any;
-  url: string;
-  children?: SidebarMenuItem[];
 }
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
@@ -31,6 +26,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   );
 
   const [collapsedItems, setCollapsedItems] = useState<Record<number, boolean>>({});
+  const [hoveredParentIndex, setHoveredParentIndex] = useState<number | null>(null);
 
   // Close on click outside
   useEffect(() => {
@@ -66,31 +62,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       document.querySelector("body")?.classList.remove("sidebar-expanded");
     }
   }, [sidebarExpanded]);
-
-  const sidebarMenu: SidebarMenuItem[] = [
-    {
-      title: "Dashboard",
-      icon: faDashboard,
-      url: "/"
-    },
-    {
-      title: "Download",
-      icon: faDownload,
-      url: "/download",
-    },
-    {
-      title: "Settings",
-      icon: faWrench,
-      url: "/settings",
-      children: [
-        {
-          title: "Profile",
-          url: "/settings/profile",
-          icon: faUser
-        }
-      ]
-    }
-  ];
 
   // Toggle function to collapse/expand menu item
   const toggleCollapse = (index: number) => {
@@ -162,12 +133,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
           <ul className="mb-6 flex flex-col gap-1.5">
             {sidebarMenu.map((item, index) => {
               const isActive = isActiveItem(item.url, item.children);
+              const isParentHovered = index === hoveredParentIndex;
               return (
                 <li key={index} className="relative">
                   <div className="flex items-center justify-between">
                     <Link
                       href={item.url}
-                      className={`group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${isActive ? "bg-graydark dark:bg-meta-4" : ""}`}
+                      className={`group relative flex items-center gap-2.5 px-4 py-2 font-medium text-bodydark1 duration-300 ease-in-out w-full ${isActive || isParentHovered ? "bg-graydark dark:bg-meta-4 rounded-full" : "hover:bg-graydark dark:hover:bg-meta-4 rounded-full"}`}
                     >
                       {item.icon && <FontAwesomeIcon icon={item.icon} className="text-blue-500" />}
                       {item.title}
@@ -189,10 +161,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                       {item.children.map((subItem, subIndex) => {
                         const isSubActive = pathname.includes(subItem.url);
                         return (
-                          <li key={subIndex}>
+                          <li
+                            key={subIndex}
+                            onMouseEnter={() => setHoveredParentIndex(index)}
+                            onMouseLeave={() => setHoveredParentIndex(null)}
+                          >
                             <Link
                               href={subItem.url}
-                              className={`group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${isSubActive ? "bg-graydark dark:bg-meta-4" : ""}`}
+                              className={`group relative flex items-center gap-2.5 px-4 py-2 font-medium text-bodydark1 duration-300 ease-in-out ${isSubActive ? "bg-graydark dark:bg-meta-4 rounded-full" : "rounded-sm hover:rounded-full hover:bg-graydark dark:hover:bg-meta-4"}`}
                             >
                               <FontAwesomeIcon icon={subItem.icon} className="text-blue-300" />
                               {subItem.title}
