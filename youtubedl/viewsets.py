@@ -38,7 +38,7 @@ class YoutubeDLViewSet(viewsets.ViewSet):
                 'path': ydl.path,
                 'url': ydl.url,
                 'type': ydl.type,
-                's3_uploaded': ydl.download_and_upload_s3(),
+                'download': ydl.download(),
             }
             # return Response(data=response,status=status.HTTP_200_OK)
 

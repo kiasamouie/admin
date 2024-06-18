@@ -39,9 +39,8 @@ const Download: React.FC = () => {
     setIsLoading(true);
     download(data.url).json((json) => {
       setIsLoading(false);
-      console.log(json);
-      if (json.success && json.s3_uploaded) {
-        setDownloadLinks(json.s3_uploaded);
+      if (json.success && json.download) {
+        setDownloadLinks(json.download);
         toast.success("Downloaded");
       } else {
         toast.error('Error Downloading');
