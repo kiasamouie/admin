@@ -13,6 +13,25 @@ const download = (url: string) => {
   return api.post({ url: url }, "/api/youtubedl/download/");
 };
 
+const save_track = (dir: string) => {
+  return api
+    .post({ dir: dir }, "/api/youtubedl/save_track/")
+    .res(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = dir.split("/").pop() || "downloaded_file";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+      console.error("File download failed:", error);
+    });
+};
+
 /**
  * Exports YoutubeDL related actions.
  * @returns {Object} An object containing all the YoutubeDL actions.
@@ -20,5 +39,6 @@ const download = (url: string) => {
 export const YoutubeDLActions = () => {
   return {
     download,
+    save_track,
   };
 };

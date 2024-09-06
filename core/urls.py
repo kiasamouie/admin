@@ -4,9 +4,11 @@ from rest_framework.routers import DefaultRouter
 
 from auth.views import LoginView, LogoutView
 from youtubedl.viewsets import YoutubeDLViewSet 
+from playlist.viewsets import PlaylistViewSet
 
 router = DefaultRouter()
 router.register(r"youtubedl", YoutubeDLViewSet, basename="youtubedl")
+router.register(r"playlist", PlaylistViewSet, basename="playlist")
 
 urlpatterns = [
     path("admin/", admin.site.urls),

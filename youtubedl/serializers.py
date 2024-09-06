@@ -17,16 +17,18 @@ class TrackSerializer(serializers.ModelSerializer):
         fields = "__all__"
     
     def __init__(self, *args, **kwargs):
-        ydl = None
-        data = kwargs.get('data')
-        if args and isinstance(args[0], YoutubeDLHelper):
-            ydl = args[0]
-            args = args[1:]
+        ydl = kwargs.pop('ydl', None)
+        data = kwargs.get('data', None)
+        if ydl:
             data = ydl.info[0]
-
-        if data and isinstance(data, dict):
+        if data:
             data['upload_id'] = data['id']
-            data['timestamp'] = datetime.fromtimestamp(data['timestamp'], tz=timezone.utc)
+            
+            if 'timestamp' in data:
+                data['timestamp'] = datetime.fromtimestamp(data['timestamp'], tz=timezone.utc)
+            elif 'upload_date' in data:
+                data['timestamp'] = datetime.strptime(data['upload_date'], "%Y%m%d")
+
             for thumbnail in data['thumbnails']:
                 for k in ['id', 'preference', 'resolution']:
                     if k in thumbnail:
@@ -58,7 +60,7 @@ class TrackSerializer(serializers.ModelSerializer):
                     del data[k]
             
             kwargs['data'] = data
-        super(TrackSerializer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
     
     def to_representation(self, instance):
         """
@@ -75,6 +77,19 @@ class TrackSerializer(serializers.ModelSerializer):
             Thumbnail.objects.create(track=track, **thumbnail)
         return track
 
+    def update(self, instance, validated_data):
+        thumbnails = validated_data.pop('thumbnails', [])
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update thumbnails
+        instance.thumbnails.all().delete()
+        for thumbnail in thumbnails:
+            Thumbnail.objects.create(track=instance, **thumbnail)
+        
+        return instance
+
 class PlaylistSerializer(serializers.ModelSerializer):
     tracks = TrackSerializer(many=True)
     class Meta:
@@ -82,30 +97,25 @@ class PlaylistSerializer(serializers.ModelSerializer):
         fields = "__all__"
     
     def __init__(self, *args, **kwargs):
-        ydl = None
-        if args and isinstance(args[0], YoutubeDLHelper):
-            ydl = args[0]
-            args = args[1:]
+        ydl = kwargs.pop('ydl', None)
+        if ydl:
             data = ydl.info[0]
-        if ydl and hasattr(ydl, 'info') and isinstance(ydl.info, list):
             kwargs['data'] = {
                 'title': data['playlist_title'],
                 'upload_id': data['playlist_id'],
-                'uploader': ydl.parts[3],
                 'extractor': data['extractor'],
                 'extractor_key': data['extractor_key'],
                 'webpage_url': ydl.url,
-                'webpage_url_basename': ydl.parts[5],
                 'tracks': []
             }
             for track in ydl.info:
-                serializer = TrackSerializer(data=track)
-                if serializer.is_valid():
-                    kwargs['data']['tracks'].append(serializer.validated_data)
+                track_serializer = TrackSerializer(data=track)
+                if track_serializer.is_valid():
+                    kwargs['data']['tracks'].append(track_serializer.validated_data)
                 else:
-                    print(serializer.errors)
-                    exit(serializer.errors)
-        super(PlaylistSerializer, self).__init__(*args, **kwargs)
+                    print(track_serializer.errors)
+                    exit(track_serializer.errors)
+        super().__init__(*args, **kwargs)
 
     def create(self, validated_data):
         tracks = validated_data.pop('tracks', [])
@@ -117,3 +127,20 @@ class PlaylistSerializer(serializers.ModelSerializer):
                 Thumbnail.objects.create(**thumbnail, track=track)
             playlist.tracks.add(track)
         return playlist
+    
+    def update(self, instance, validated_data):
+        tracks = validated_data.pop('tracks', [])
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update tracks and their thumbnails
+        instance.tracks.all().delete()
+        for track in tracks:
+            thumbnails = track.pop('thumbnails', [])
+            track = Track.objects.create(**track)
+            for thumbnail in thumbnails:
+                Thumbnail.objects.create(**thumbnail, track=track)
+            instance.tracks.add(track)
+        
+        return instance

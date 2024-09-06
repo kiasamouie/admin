@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     # created apps
     'core.apps.CoreConfig',
     "youtubedl",
+    "playlist",
 ]
 
 MIDDLEWARE = [

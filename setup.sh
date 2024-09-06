@@ -16,7 +16,7 @@ echo_progress() {
 # Update package manager and install ffmpeg, npm, awscli
 echo_progress "Setting up ffmpeg..."
 apt-get update
-apt-get install -y ffmpeg npm awscli
+apt-get install -y ffmpeg npm awscli tree
 
 # Setup Backend
 echo_progress "Setting up backend..."
@@ -28,9 +28,9 @@ pip install -r requirements.txt || { echo "Failed to install backend requirement
 # Django Migrations (commented out, uncomment if needed)
 # python manage.py migrate || { echo "Django migrate command failed"; exit 1; }
 
-# Create superuser non-interactively
-echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('admin', 'admin@admin.com', '123')" | python manage.py shell || { echo "Failed to create superuser"; exit 1; }
-echo_success "Superuser created successfully."
+# Create superuser and Profile non-interactively
+echo "from django.contrib.auth import get_user_model; from auth.models import Profile; User = get_user_model(); admin_user = User.objects.create_superuser('admin', 'admin@admin.com', '123'); Profile.objects.create(user=admin_user, phone_number='123456789', address='Admin Address')" | python manage.py shell || { echo "Failed to create superuser and profile"; exit 1; }
+echo_success "Superuser and Profile created successfully."
 echo_success "Done setting up backend."
 
 # Setup Frontend

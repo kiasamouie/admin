@@ -21,7 +21,7 @@ type FormData = {
 const Download: React.FC = () => {
   const router = useRouter();
   const { login, storeToken, loggedIn } = AuthActions();
-  const { download } = YoutubeDLActions();
+  const { download, save_track } = YoutubeDLActions();
   const {
     register,
     handleSubmit,
@@ -33,7 +33,7 @@ const Download: React.FC = () => {
   const [downloadLinks, setDownloadLinks] = useState<string[]>([]);
   const [prevErrors, setPrevErrors] = useState<string[]>([]);
 
-  const urlPattern = /^(https:\/\/(?:www\.youtube\.com\/watch\?v=.+|soundcloud\.com\/.+\/.+))$/;
+  const urlPattern = /^(https:\/\/(?:www\.youtube\.com\/(?:watch\?v=.+|playlist\?list=.+)|soundcloud\.com\/.+\/(?:sets\/.+|.+)|open\.spotify\.com\/(?:track\/.+|playlist\/.+)))$/;
 
   const onSubmit = (data: FormData) => {
     setIsLoading(true);
@@ -52,7 +52,7 @@ const Download: React.FC = () => {
         toast.error('Error Downloading');
       });
   };
-  
+
   return (
     <DefaultLayout>
       <Breadcrumb pageName="Download" />
@@ -97,7 +97,7 @@ const Download: React.FC = () => {
                   <ul>
                     {downloadLinks.map((link, index) => (
                       <li key={index} className="mb-2">
-                        <a href={link} download className="text-primary hover:underline flex items-center">
+                        <a href="#" onClick={() => save_track(link)} className="text-primary hover:underline flex items-center">
                           <FontAwesomeIcon icon={faDownload} className="mr-2" />
                           {link.split('/').pop()}
                         </a>

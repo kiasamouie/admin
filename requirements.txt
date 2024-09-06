@@ -56,7 +56,7 @@ social-auth-core==4.5.4
 spotify_dl==8.9.0
 spotipy==2.24.0
 sqlparse==0.5.0
-thelofiwipystation @ git+https://github.com/kiasamouie/thelofiwipystation.git@3fa757b2632fc25380ee53166e5d2558b3e870cb
+thelofiwipystation @ git+https://github.com/kiasamouie/thelofiwipystation.git@eebd5f47ff70fd7a901a14d7c92100826f32b609
 toml==0.10.2
 tqdm==4.66.4
 urllib3==1.26.19

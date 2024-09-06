@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 import json
+import re
 import subprocess
 from dotenv import load_dotenv
 import os
@@ -8,6 +9,7 @@ import boto3
 import concurrent.futures
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+import shutil as sh
 
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
@@ -19,47 +21,82 @@ def log(message):
 
 class YoutubeDLHelper:
     ydl = None
-    parts = ''
     path = ''
     type = ''
+    platform = ''
+    save_directory = ''
     
     def __init__(self, url) -> None:
         self.url = url
-        self.info = self.extract_info_cmd(url)
         self.uploaded = []
+        self.extract_info(url)
     
-    def extract_info_cmd(self, url: str) -> list[dict]:
-        command = [
-            'yt-dlp',
-            '--skip-download',
-            '--print-json',
-            url
-        ]
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    def extract_info(self, url: str) -> list[dict]:
         info = []
-        for line in process.stdout:
-            strip = line.strip()
-            if strip:  
-                info.append(json.loads(strip))
-        errors = process.stderr.read()
-        if errors:
-            exit(f"Error extracting metadata: {errors}")
+        platform, type = self.identify_url_components()
+        if platform == 'spotify':
+            spotify = SpotifyClient()
+            info.append(spotify.get_track_info(url) if type == 'track' else spotify.get_playlist_info(url))
+        elif platform in ['youtube', 'soundcloud']:
+            command = [
+                'yt-dlp',
+                '--skip-download',
+                '--print-json',
+                url
+            ]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for line in process.stdout:
+                strip = line.strip()
+                if strip:
+                    info.append(json.loads(strip))
+            errors = process.stderr.read()
+            if errors:
+                print(f"Error extracting metadata: {errors}")
 
-        output, errors = process.communicate()
-
-        process.stdout.close()
-        process.stderr.close()
-        process.wait()
-
-        self.parts = url.split("/")
-        if len(info) > 1:
-            self.type = "playlist"
-            save_directory = self.parts[5]
+            output, errors = process.communicate()
+            process.stdout.close()
+            process.stderr.close()
+            process.wait()
         else:
-            self.type = "track"
-            save_directory = os.path.join("tracks", f"{info[0]['webpage_url_basename']}.mp3")
-        self.path = os.path.join(self.parts[3], save_directory)
-        return info
+            exit(f"Unsupported URL: {url}")
+            
+        if platform in ['youtube', 'soundcloud']:
+            name = info[0]['playlist_id'] if type == 'playlist' else info[0]['id']
+            uploader = info[0]['uploader'] if platform == 'youtube' else self.url.split("/")[3]
+        elif platform == 'spotify':
+            if type == 'playlist':
+                name = info[0]['name']
+                uploader = info[0]['owner']['display_name']
+            else:
+                name = info[0]['id']
+                uploader = info[0]['artists'][0]['name']
+
+        self.path = os.path.join(platform,uploader,name)
+        self.platform = platform
+        self.type = type
+        self.info = info
+
+    def identify_url_components(self) -> tuple[str, str]:
+        if re.compile(r'spotify\.com/track/').search(self.url):
+            # Spotify Track
+            return 'spotify', 'track'
+        elif re.compile(r'spotify\.com/(album|playlist)/').search(self.url):
+            # Spotify Playlist
+            return 'spotify', 'playlist'
+        elif re.compile(r'soundcloud\.com/[^/]+/[^/]+$').search(self.url):
+            # SoundCloud Track
+            return 'soundcloud', 'track'
+        elif re.compile(r'soundcloud\.com/[^/]+/sets/').search(self.url):
+            # SoundCloud Playlist
+            return 'soundcloud', 'playlist'
+        elif re.compile(r'youtube\.com/watch\?v=').search(self.url):
+            # YouTube Video
+            return 'youtube', 'track'
+        elif re.compile(r'youtube\.com/playlist\?list=').search(self.url):
+            # YouTube Playlist
+            return 'youtube', 'playlist'
+        else:
+            exit(f"Unsupported URL: {self.url}")
 
     def download(self, upload_s3: bool = False) -> any:
         if upload_s3:
@@ -70,15 +107,17 @@ class YoutubeDLHelper:
                 return msg
         else:
             self.path = os.path.join("/media", self.path)
+            if os.path.isdir(self.path) and self.type == "playlist":
+                sh.rmtree(self.path)
 
         def process_track(track) -> any:
-            key = os.path.join(self.path, f"{track['webpage_url_basename']}.mp3") if self.type == "playlist" else self.path
+            key = os.path.join(self.path, track['webpage_url_basename']) if self.type == "playlist" else self.path
             
             download_cmd = [
                 'yt-dlp',
                 '--format', 'bestaudio/best',
                 '--extract-audio',
-                '--audio-format', 'mp3',
+                '--audio-format', 'wav',
                 '--audio-quality', '0',
                 '-o'
             ]
@@ -114,7 +153,7 @@ class YoutubeDLHelper:
                 output, errors = download.communicate()
                 if download.returncode == 0:
                     log(f"Downloaded: {key}")
-                    return key
+                    return f"{key}.wav"
                 else:
                     log(f"Error downloading {track['webpage_url_basename']}: {errors.decode()}")
                     return None
