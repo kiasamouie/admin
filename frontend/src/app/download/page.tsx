@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import Link from "next/link";
-import Image from "next/image";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { AuthActions } from "@/app/auth/utils";
@@ -11,33 +10,43 @@ import { YoutubeDLActions } from "@/app/download/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faPlus, faMinus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Loader from "@/components/common/Loader";
 
 type FormData = {
   url: string;
+  timestamps: { start: string, end: string }[];
 };
 
 const Download: React.FC = () => {
   const router = useRouter();
   const { login, storeToken, loggedIn } = AuthActions();
   const { download, save_track } = YoutubeDLActions();
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setError,
-  } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<FormData>({
+    defaultValues: {
+      url: "https://soundcloud.com/simula/simula-iii-1",
+      timestamps: [
+        { start: '00:00:30', end: '00:01:00' },
+        { start: '00:02:00', end: '00:02:30' },
+        { start: '00:03:00', end: '00:03:30' }
+      ],
+    }
+  });
 
   const [isLoading, setIsLoading] = useState(false);
   const [downloadLinks, setDownloadLinks] = useState<string[]>([]);
-  const [prevErrors, setPrevErrors] = useState<string[]>([]);
 
   const urlPattern = /^(https:\/\/(?:www\.youtube\.com\/(?:watch\?v=.+|playlist\?list=.+)|soundcloud\.com\/.+\/(?:sets\/.+|.+)|open\.spotify\.com\/(?:track\/.+|playlist\/.+)))$/;
+  const timestampPattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/; // hh:mm:ss format validation
 
   const onSubmit = (data: FormData) => {
     setIsLoading(true);
-    download(data.url).json((json) => {
+    const requestData = {
+      ...data,
+      timestamps: !!data.timestamps ? data.timestamps : [],
+    };
+
+    download(requestData).json((json) => {
       setIsLoading(false);
       if (json.success && json.download) {
         setDownloadLinks(json.download);
@@ -51,6 +60,51 @@ const Download: React.FC = () => {
         console.log(err);
         toast.error('Error Downloading');
       });
+  };
+
+  const timestamps = watch("timestamps"); // Use watch to track changes in timestamps
+
+  // useEffect to listen for changes in the last "end" timestamp field
+  useEffect(() => {
+    if (timestamps.length > 0) {
+      const mostRecentTimestamp = timestamps[timestamps.length - 1];
+  
+      if (mostRecentTimestamp.end && mostRecentTimestamp.start) {
+        const duplicateIndex = timestamps.findIndex((timestamp, i) =>
+          timestamps.some((otherTimestamp, j) =>
+            i !== j && timestamp.start === otherTimestamp.start && timestamp.end === otherTimestamp.end
+          )
+        );
+  
+        if (duplicateIndex !== -1) {
+          toast.error("This timestamp already exists.");
+          timestamps[timestamps.length - 1] = { start: "", end: "" }; // Clear most recent values
+          setValue("timestamps", timestamps); // Update the form values
+        }
+      }
+    }
+  }, [timestamps[timestamps.length - 1]?.end]); // Only run when the most recent 'end' field changes
+  
+
+  const addTimestamp = () => {
+    // Check if the last timestamp is fully completed
+    const lastTimestamp = timestamps[timestamps.length - 1];
+    if (!!lastTimestamp && (!lastTimestamp.start || !lastTimestamp.end)) {
+      toast.error("Please finish last timestamp.");
+      return;
+    }
+    const newTimestamp = { start: "", end: "" };
+    const updatedTimestamps = [...timestamps, newTimestamp];
+    setValue("timestamps", updatedTimestamps);
+  };
+
+  const removeTimestamp = (index: number) => {
+    const updatedTimestamps = timestamps.filter((_, i) => i !== index);
+    setValue("timestamps", updatedTimestamps);
+  };
+
+  const removeAllTimestamps = () => {
+    setValue("timestamps", []);
   };
 
   return (
@@ -81,8 +135,55 @@ const Download: React.FC = () => {
                       })}
                       className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                     />
+                    {errors.url && <p className="text-red-500">{errors.url.message}</p>}
                   </div>
                 </div>
+
+                {timestamps.map((timestamp, index) => (
+                  <div key={`timestamp-${index}`} className="flex items-center mb-4 space-x-2">
+                    <input
+                      type="time"
+                      step="1"
+                      placeholder="Start time (hh:mm:ss)"
+                      {...register(`timestamps.${index}.start`, {
+                        required: "Start time is required",
+                        pattern: {
+                          value: timestampPattern,
+                          message: "Incorrect time format (hh:mm:ss)"
+                        }
+                      })}
+                      className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    />
+                    <input
+                      type="time"
+                      step="1"
+                      placeholder="End time (hh:mm:ss)"
+                      {...register(`timestamps.${index}.end`, {
+                        required: "End time is required",
+                        pattern: {
+                          value: timestampPattern,
+                          message: "Incorrect time format (hh:mm:ss)"
+                        }
+                      })}
+                      className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    />
+                    <button type="button" onClick={() => removeTimestamp(index)} className="ml-2 text-red-500">
+                      <FontAwesomeIcon icon={faMinus} />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="mb-4 flex items-center space-x-4">
+                  <button type="button" onClick={addTimestamp} className="text-blue-500">
+                    <FontAwesomeIcon icon={faPlus} /> Add Timestamp
+                  </button>
+                  {timestamps.length > 1 && (
+                    <button type="button" onClick={removeAllTimestamps} className="text-red-500">
+                      <FontAwesomeIcon icon={faTrash} /> Remove All Timestamps
+                    </button>
+                  )}
+                </div>
+
                 <div className="mb-5">
                   <input
                     type="submit"
@@ -91,6 +192,7 @@ const Download: React.FC = () => {
                   />
                 </div>
               </form>
+
               {downloadLinks.length > 0 && (
                 <div className="mt-6">
                   <h3 className="mb-4 text-lg font-medium text-black dark:text-white">Download Links</h3>
@@ -114,4 +216,4 @@ const Download: React.FC = () => {
   );
 };
 
-export default Download;
+export default Download

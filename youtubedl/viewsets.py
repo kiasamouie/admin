@@ -1,4 +1,6 @@
 import os
+import re
+from urllib.parse import quote
 from django.http import FileResponse
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.views import APIView
@@ -40,10 +42,10 @@ class YoutubeDLViewSet(viewsets.ViewSet):
                 'url': ydl.url,
                 'type': ydl.type,
                 'platform': ydl.platform,
-                'download': ydl.download(),
+                # 'download': ydl.download(timestamps=request.data["timestamps"]),
             }
 
-            # return Response(data=response, status=status.HTTP_200_OK)
+            return Response(data=response, status=status.HTTP_200_OK)
 
             if ydl.type == 'track':
                 result = self.handle_download(ydl, TrackSerializer, Track, ydl.info[0]['id'])
@@ -74,12 +76,15 @@ class YoutubeDLViewSet(viewsets.ViewSet):
     @action(methods=['post'], detail=False)
     def save_track(self, request):
         try:
+            file_path = request.data.get("dir")
+            escaped_path = re.sub(r'(:)', r'\\:', re.sub(r'(\s)', r'\\ ', file_path))
             response = {
                 'success': False,
                 'message': 'File not found',
+                'file_path' : file_path,
+                'escaped_path' : escaped_path,
             }
 
-            file_path = request.data.get("dir")
             if os.path.isfile(file_path):
                 file_handle = open(file_path, 'rb')
                 response = FileResponse(file_handle, as_attachment=True, filename=os.path.basename(file_path))

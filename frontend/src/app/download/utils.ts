@@ -5,12 +5,12 @@ import Cookies from "js-cookie";
 const api = wretch("http://localhost:8000").accept("application/json");
 
 /**
- * Download using YoutubeDL with url.
- * @param {string} url - The YoutubeDL url.
+ * Download using YoutubeDL with requestData.
+ * @param {Object} requestData - The request data object containing url, timestamps, and other data.
  * @returns {Promise} A promise that resolves with the download response.
  */
-const download = (url: string) => {
-  return api.post({ url: url }, "/api/youtubedl/download/");
+const download = (requestData: { url: string; timestamps: { start: string; end: string }[]; }) => {
+  return api.post(requestData, "/api/youtubedl/download/");
 };
 
 const save_track = (dir: string) => {

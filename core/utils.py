@@ -11,13 +11,22 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import shutil as sh
 
-
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 logger = logging.getLogger(__name__)  
 
 def log(message):
     print(message)
     logger.info(message)
+
+def run_concurrent_tasks(task_function, items):
+    results = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(task_function, item) for item in items]
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
+    return results
 
 class YoutubeDLHelper:
     ydl = None
@@ -28,7 +37,7 @@ class YoutubeDLHelper:
     
     def __init__(self, url) -> None:
         self.url = url
-        self.uploaded = []
+        self.downloaded = []
         self.extract_info(url)
     
     def extract_info(self, url: str) -> list[dict]:
@@ -61,110 +70,78 @@ class YoutubeDLHelper:
             exit(f"Unsupported URL: {url}")
             
         if platform in ['youtube', 'soundcloud']:
-            name = info[0]['playlist_id'] if type == 'playlist' else info[0]['id']
+            name = info[0]['playlist_title'] if type == 'playlist' else info[0]['title']
             uploader = info[0]['uploader'] if platform == 'youtube' else self.url.split("/")[3]
         elif platform == 'spotify':
             if type == 'playlist':
                 name = info[0]['name']
                 uploader = info[0]['owner']['display_name']
             else:
-                name = info[0]['id']
+                name = info[0]['title']
                 uploader = info[0]['artists'][0]['name']
 
-        self.path = os.path.join(platform,uploader,name)
+        self.path = os.path.join("/media", platform, uploader, name)
         self.platform = platform
         self.type = type
         self.info = info
 
     def identify_url_components(self) -> tuple[str, str]:
-        if re.compile(r'spotify\.com/track/').search(self.url):
-            # Spotify Track
-            return 'spotify', 'track'
-        elif re.compile(r'spotify\.com/(album|playlist)/').search(self.url):
-            # Spotify Playlist
-            return 'spotify', 'playlist'
-        elif re.compile(r'soundcloud\.com/[^/]+/[^/]+$').search(self.url):
-            # SoundCloud Track
-            return 'soundcloud', 'track'
-        elif re.compile(r'soundcloud\.com/[^/]+/sets/').search(self.url):
-            # SoundCloud Playlist
-            return 'soundcloud', 'playlist'
-        elif re.compile(r'youtube\.com/watch\?v=').search(self.url):
-            # YouTube Video
-            return 'youtube', 'track'
-        elif re.compile(r'youtube\.com/playlist\?list=').search(self.url):
-            # YouTube Playlist
-            return 'youtube', 'playlist'
-        else:
-            exit(f"Unsupported URL: {self.url}")
+        url_patterns = [
+            ('spotify', 'track', r'spotify\.com/track/'),
+            ('spotify', 'playlist', r'spotify\.com/(album|playlist)/'),
+            ('soundcloud', 'track', r'soundcloud\.com/[^/]+/[^/]+$'),
+            ('soundcloud', 'playlist', r'soundcloud\.com/[^/]+/sets/'),
+            ('youtube', 'track', r'youtube\.com/watch\?v='),
+            ('youtube', 'playlist', r'youtube\.com/playlist\?list=')
+        ]
+        for platform, url_type, pattern in url_patterns:
+            if re.search(pattern, self.url):
+                return platform, url_type
+        exit(f"Unsupported URL: {self.url}")
 
-    def download(self, upload_s3: bool = False) -> any:
-        if upload_s3:
-            s3 = S3Client()
-            if s3.client is None:
-                msg = "S3 CREDENTIALS MISSING"
-                log(msg)
-                return msg
-        else:
-            self.path = os.path.join("/media", self.path)
-            if os.path.isdir(self.path) and self.type == "playlist":
-                sh.rmtree(self.path)
+    def create_snippet(self, input, timestamp, output):
+        subprocess.call([
+            "ffmpeg", "-i", f"{input}.wav", "-ss", timestamp['start'], "-to", timestamp['end'], "-c:a", "pcm_s16le", "-ar", "44100", f"{output}.wav"
+        ])
+        print(f"Snippet created: {output}")
 
+    def process_snippet(self, path, timestamp):
+        snippet_output = os.path.join(path.rsplit("/", 1)[0], f"{timestamp['start'].replace(':', '')}_{timestamp['end'].replace(':', '')}")
+        self.create_snippet(path, timestamp, snippet_output)
+        return f"{snippet_output}.wav"
+
+    def download(self, timestamps: list = None) -> any:
+        if os.path.isdir(self.path) and self.type == "playlist":
+            sh.rmtree(self.path)
+        
         def process_track(track) -> any:
-            key = os.path.join(self.path, track['webpage_url_basename']) if self.type == "playlist" else self.path
-            
+            save = self.path
+            if self.type == "playlist":
+                save = os.path.join(save, track['webpage_url_basename'])
+            elif timestamps:
+                os.makedirs(save, exist_ok=True)
+                save = os.path.join(save, track['title'])
+
             download_cmd = [
                 'yt-dlp',
                 '--format', 'bestaudio/best',
                 '--extract-audio',
                 '--audio-format', 'wav',
                 '--audio-quality', '0',
-                '-o'
+                '-o', save, track['webpage_url']
             ]
-
-            if upload_s3:
-                download_cmd.append('-')
+            download = subprocess.Popen(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, errors = download.communicate()
+            if download.returncode == 0:
+                if timestamps:
+                    self.downloaded.extend(run_concurrent_tasks(lambda t: self.process_snippet(save, t), timestamps))
+                return f"{save}.wav"
             else:
-                download_cmd.append(key)
-            download_cmd.append(track['webpage_url'])
-            
-            if upload_s3:
-                if s3.file_exists(key):
-                    log(f"File already exists: {key}")
-                    return s3.file_url(track, key)
-                
-                upload_cmd = [
-                    'aws', 's3', 'cp', '-',
-                    f's3://{s3.bucket}/{key}',
-                    '--acl', 'public-read'
-                ]
-                download = subprocess.Popen(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                upload = subprocess.Popen(upload_cmd, stdin=download.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                download.stdout.close()
-                output, errors = upload.communicate()
-                if upload.returncode == 0:
-                    log(f"Uploaded: {key}")
-                    return s3.file_url(track, key)
-                else:
-                    log(f"Error uploading {track['webpage_url_basename']}: {errors.decode()}")
-                    return None
-            else:
-                download = subprocess.Popen(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                output, errors = download.communicate()
-                if download.returncode == 0:
-                    log(f"Downloaded: {key}")
-                    return f"{key}.wav"
-                else:
-                    log(f"Error downloading {track['webpage_url_basename']}: {errors.decode()}")
-                    return None
+                print(f"Error downloading {track['webpage_url_basename']}: {errors.decode()}")
+                return None
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(process_track, track) for track in self.info]
-            for future in concurrent.futures.as_completed(futures):
-                result = future.result()
-                if result:
-                    self.uploaded.append(result)
-        return self.uploaded
+        self.downloaded.extend(run_concurrent_tasks(process_track, self.info))
+        return self.downloaded
     
 class S3Client:
     client = None
