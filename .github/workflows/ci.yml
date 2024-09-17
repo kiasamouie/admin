@@ -14,10 +14,6 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: List Files in Root Directory
-        run: |
-          ls -la  # This lists the files and directories at the root to help debug the structure
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -37,11 +33,28 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
         run: |
           # Install Python dependencies
-          cd app  # Ensure this path is correct
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
           # Install Node.js dependencies
           cd frontend
           npm install
-          cd ../..
+          cd ..
+
+  docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the Backend Docker image
+        run: |
+          docker build -t app/backend -f Dockerfile .
+
+      - name: Build the Frontend Docker image
+        run: |
+          docker build -t app/frontend -f frontend/Dockerfile .
