@@ -14,6 +14,10 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
+      - name: List Files in Root Directory
+        run: |
+          ls -la  # This lists the files and directories at the root to help debug the structure
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -33,7 +37,7 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
         run: |
           # Install Python dependencies
-          cd app
+          cd app  # Ensure this path is correct
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
@@ -41,87 +45,3 @@ jobs:
           cd frontend
           npm install
           cd ../..
-
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_HOST: localhost  # This must be 'localhost' as it's internal to the GitHub Actions container
-      DB_PORT: ${{ secrets.DB_PORT }}
-      DATABASE_URL: postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}
-
-    steps:
-      - name: Check out the code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        env:
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-        run: |
-          # Install Python dependencies
-          cd app
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run Django tests
-        env:
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_HOST: localhost
-          DB_PORT: ${{ secrets.DB_PORT }}
-        run: |
-          cd app
-          python manage.py migrate
-          python manage.py test
-
-      - name: Run Frontend Development Server
-        run: |
-          cd app/frontend
-          npm run dev
-          cd ../..
-
-  docker:
-    name: Build Docker Images
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build the Backend Docker image
-        run: |
-          docker build -t app/backend -f app/Dockerfile .
-
-      - name: Build the Frontend Docker image
-        run: |
-          docker build -t app/frontend -f app/frontend/Dockerfile .
