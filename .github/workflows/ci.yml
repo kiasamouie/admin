@@ -14,11 +14,6 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Load .env variables
-        run: |
-          # Load the .env file
-          cp app/.env .env
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -30,6 +25,12 @@ jobs:
           node-version: '18'
 
       - name: Install Python and Node.js dependencies
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
         run: |
           # Install Python dependencies
           cd app
@@ -71,17 +72,18 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Load .env variables
-        run: |
-          # Load the .env file
-          cp app/.env .env
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
         run: |
           # Install Python dependencies
           cd app
@@ -89,6 +91,12 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Django tests
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: localhost
+          DB_PORT: ${{ secrets.DB_PORT }}
         run: |
           cd app
           python manage.py migrate
