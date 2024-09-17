@@ -1,42 +1,60 @@
-# version: '3.8'
+name: CI
 
-services:
-  backend:
-    build: .
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      - db  # This ensures that the db service is started before the backend
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    volumes:
-      - ./frontend:/app
-    ports:
-      - "3000:3000"
+jobs:
+  setup:
+    name: Set up Environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
 
-  db:
-    image: postgres:latest  # Using the latest PostgreSQL image from Docker Hub
-    volumes:
-      - postgres_data:/var/lib/postgresql/data  # Persistent volume for database storage
-    environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_HOST=${DB_HOST}
-      - POSTGRES_PORT=${DB_PORT}
-    ports:
-      - "5432:5432"  # Optional: Map the default PostgreSQL port to host (if needed for local access)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-volumes:
-  postgres_data:  # Defines the volume for persisting database data
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Python and Node.js dependencies
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+        run: |
+          # Install Python dependencies
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Install Node.js dependencies
+          cd frontend
+          npm install
+          cd ..
+
+  docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the Backend Docker image
+        run: |
+          docker build -t app/backend -f Dockerfile .
+
+      - name: Build the Frontend Docker image
+        run: |
+          docker build -t app/frontend -f frontend/Dockerfile .
