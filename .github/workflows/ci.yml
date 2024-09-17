@@ -57,4 +57,4 @@ jobs:
 
       - name: Build the Frontend Docker image
         run: |
-          docker build -t app/frontend -f frontend/Dockerfile .
+          docker build -t app/frontend -f frontend/Dockerfile ./frontend
