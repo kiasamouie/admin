@@ -116,8 +116,16 @@ class YoutubeDLHelper:
         
         def process_track(track) -> any:
             save = self.path
+            if self.platform == "spotify":
+                track = track['track']
+                name = track['name']
+                url = track['external_urls']['spotify']
+            else:
+                name = track['webpage_url_basename']
+                url = track['webpage_url']
+
             if self.type == "playlist":
-                save = os.path.join(save, track['webpage_url_basename'])
+                save = os.path.join(save, name)
             elif timestamps:
                 os.makedirs(save, exist_ok=True)
                 save = os.path.join(save, track['title'])
@@ -128,7 +136,7 @@ class YoutubeDLHelper:
                 '--extract-audio',
                 '--audio-format', 'wav',
                 '--audio-quality', '0',
-                '-o', save, track['webpage_url']
+                '-o', save, url
             ]
             download = subprocess.Popen(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, errors = download.communicate()
@@ -137,10 +145,12 @@ class YoutubeDLHelper:
                     self.downloaded.extend(run_concurrent_tasks(lambda t: self.process_snippet(save, t), timestamps))
                 return f"{save}.wav"
             else:
-                print(f"Error downloading {track['webpage_url_basename']}: {errors.decode()}")
+                print(f"Error downloading {name}: {errors.decode()}")
                 return None
+            
 
-        self.downloaded.extend(run_concurrent_tasks(process_track, self.info))
+        tracks = self.info[0]['tracks']['items'] if self.platform == 'spotify' else self.info
+        self.downloaded.extend(run_concurrent_tasks(process_track, tracks))
         return self.downloaded
     
 class S3Client:

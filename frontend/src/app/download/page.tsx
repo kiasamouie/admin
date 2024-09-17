@@ -24,12 +24,8 @@ const Download: React.FC = () => {
   const { download, save_track } = YoutubeDLActions();
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<FormData>({
     defaultValues: {
-      url: "https://soundcloud.com/simula/simula-iii-1",
-      timestamps: [
-        { start: '00:00:30', end: '00:01:00' },
-        { start: '00:02:00', end: '00:02:30' },
-        { start: '00:03:00', end: '00:03:30' }
-      ],
+      url: "",
+      timestamps: [],
     }
   });
 

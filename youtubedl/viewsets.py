@@ -42,7 +42,7 @@ class YoutubeDLViewSet(viewsets.ViewSet):
                 'url': ydl.url,
                 'type': ydl.type,
                 'platform': ydl.platform,
-                # 'download': ydl.download(timestamps=request.data["timestamps"]),
+                'download': ydl.download(timestamps=request.data["timestamps"]),
             }
 
             return Response(data=response, status=status.HTTP_200_OK)
