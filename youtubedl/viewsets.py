@@ -45,7 +45,7 @@ class YoutubeDLViewSet(viewsets.ViewSet):
                 'download': ydl.download(timestamps=request.data["timestamps"]),
             }
 
-            return Response(data=response, status=status.HTTP_200_OK)
+            # return Response(data=response, status=status.HTTP_200_OK)
 
             if ydl.type == 'track':
                 result = self.handle_download(ydl, TrackSerializer, Track, ydl.info[0]['id'])
