@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from auth.views import LoginView, LogoutView
+from auth.views import LoginView, LogoutView, UserView
 from youtubedl.viewsets import YoutubeDLViewSet 
 from playlist.viewsets import PlaylistViewSet
 
@@ -16,5 +16,6 @@ urlpatterns = [
     # path("auth/", include("djoser.urls.jwt")),
     path('auth/jwt/create/', LoginView.as_view(), name='jwt-create'),
     path("auth/logout/", LogoutView.as_view()),
-    path("api/", include(router.urls)), 
+    path("auth/update/", UserView.as_view(), name='auth-update'),
+    path("api/", include(router.urls))
 ]

@@ -9,11 +9,10 @@ from rest_framework.decorators import action
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Track, Playlist, Thumbnail
-from .serializers import TrackSerializer, PlaylistSerializer, ThumbnailSerializer
+from .serializers import TrackSerializer, PlaylistSerializer
 
 from django.core.exceptions import ObjectDoesNotExist
 from core.utils import YoutubeDLHelper
-from django.forms.models import model_to_dict
 
 class YoutubeDLViewSet(viewsets.ViewSet):
     permission_classes = (AllowAny,)

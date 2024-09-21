@@ -1,5 +1,4 @@
 'use client';
-
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Image from "next/image";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
@@ -14,6 +13,7 @@ const { getToken } = AuthActions();
 const Profile = () => {
   const router = useRouter();
   const user = getToken('user');
+
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-242.5">
@@ -79,7 +79,8 @@ const Profile = () => {
               <h3 className="mb-1.5 text-2xl font-semibold text-black dark:text-white">
                 {`${user.first_name} ${user.last_name}`}
               </h3>
-              <p className="font-medium">Ui/Ux Designer</p>
+              <p className="font-medium">{user.username}</p>
+              <p className="text-gray-500 mt-2">{user.email}</p>
               <div className="mx-auto mb-5.5 mt-4.5 grid max-w-94 grid-cols-3 rounded-md border border-stroke py-2.5 shadow-1 dark:border-strokedark dark:bg-[#37404F]">
                 <div className="flex flex-col items-center justify-center gap-1 border-r border-stroke px-4 dark:border-strokedark xsm:flex-row">
                   <span className="font-semibold text-black dark:text-white">
@@ -105,6 +106,10 @@ const Profile = () => {
                 <h4 className="font-semibold text-black dark:text-white">
                   About Me
                 </h4>
+                <p className="mt-4.5">
+                  {`Phone: ${user.profile.phone_number}`}<br />
+                  {`Address: ${user.profile.address}`}
+                </p>
                 <p className="mt-4.5">
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit.
                   Pellentesque posuere fermentum urna, eu condimentum mauris

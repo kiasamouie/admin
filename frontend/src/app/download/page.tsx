@@ -5,7 +5,6 @@ import { useForm, useWatch } from "react-hook-form";
 import Link from "next/link";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { AuthActions } from "@/app/auth/utils";
 import { YoutubeDLActions } from "@/app/download/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -20,7 +19,6 @@ type FormData = {
 
 const Download: React.FC = () => {
   const router = useRouter();
-  const { login, storeToken, loggedIn } = AuthActions();
   const { download, save_track } = YoutubeDLActions();
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<FormData>({
     defaultValues: {

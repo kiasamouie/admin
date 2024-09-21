@@ -113,7 +113,7 @@ class YoutubeDLHelper:
     def download(self, timestamps: list = None) -> any:
         if os.path.isdir(self.path) and self.type == "playlist":
             sh.rmtree(self.path)
-        
+
         def process_track(track) -> any:
             save = self.path
             if self.platform == "spotify":

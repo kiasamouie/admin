@@ -105,6 +105,15 @@ const resetPassword = (email: string) => {
 };
 
 /**
+ * Updates the user information.
+ * @param {FormData} user - The updated user data.
+ * @returns {Promise} A promise that resolves with the update response.
+ */
+const updateUser = (user: FormData) => {
+  return api.auth(`Bearer ${getToken('access')}`).put({ user }, "/auth/update/");
+};
+
+/**
  * Confirms the password reset with new password details.
  * @param {string} new_password - The new password.
  * @param {string} re_new_password - Confirmation of the new password.
@@ -139,6 +148,7 @@ export const AuthActions = () => {
     getToken,
     loggedIn,
     logout,
-    removeTokens
+    removeTokens, 
+    updateUser
   };
 };

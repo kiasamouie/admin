@@ -29,7 +29,7 @@ pip install -r requirements.txt || { echo "Failed to install backend requirement
 # python manage.py migrate || { echo "Django migrate command failed"; exit 1; }
 
 # Create superuser and Profile non-interactively
-echo "from django.contrib.auth import get_user_model; from auth.models import Profile; User = get_user_model(); admin_user = User.objects.create_superuser('admin', 'admin@admin.com', '123'); Profile.objects.create(user=admin_user, phone_number='123456789', address='Admin Address')" | python manage.py shell || { echo "Failed to create superuser and profile"; exit 1; }
+echo "from django.contrib.auth import get_user_model; from core.models import Profile; User = get_user_model(); admin_user = User.objects.filter(username='admin').first() or User.objects.create_superuser('admin', 'admin@admin.com', '123'); profile, created = Profile.objects.get_or_create(user=admin_user); profile.phone_number='123456789'; profile.address='Admin Address'; profile.save()" | python manage.py shell || { echo "Failed to create or update superuser and profile"; exit 1; }
 echo_success "Superuser and Profile created successfully."
 echo_success "Done setting up backend."
 
